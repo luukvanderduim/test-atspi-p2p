@@ -3,6 +3,10 @@ name    = "test-atspi-p2p"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+# Empty workspace section to avoid warnings about missing workspace members.
+
+
 [dependencies]
 async-lock = "3.4"
 atspi = { git = "https://github.com/odilia-app/atspi", branch = "p2p", version = "0.27.0", features = [
