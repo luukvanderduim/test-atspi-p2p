@@ -7,13 +7,12 @@ use atspi::connection::AccessibilityConnection;
 use atspi::connection::P2P;
 use atspi::connection::Peer;
 use atspi::proxy::accessible::ObjectRefExt;
-use pretty_assertions::assert_eq;
 use tracing_subscriber::fmt;
 use zbus::names::OwnedBusName;
 use zbus::names::OwnedUniqueName;
 use zbus::zvariant::ObjectPath;
 
-static APP_NAME: &str = "firefox";
+static APP_NAME: &str = "gedit";
 static APP_ARG: &str = "";
 
 #[tokio::main]
@@ -72,6 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .unwrap()
         .clone();
     let launched_human_readable = to_human_readable(&launched_busname, &a11y).await;
+
     assert_eq!(
         launched_human_readable.to_lowercase(),
         APP_NAME,
