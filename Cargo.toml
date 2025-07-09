@@ -8,5 +8,7 @@ async-lock = "3.4"
 atspi = { git = "https://github.com/odilia-app/atspi", branch = "p2p", version = "0.27.0", features = [
    "tracing",
 ] }
-tokio              = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 tracing-subscriber = { version = "0.3.19", features = ["fmt", "tracing-log"] }
+zbus = { version = "5.8.0", features = ["p2p", "tokio"] }
+pretty_assertions = "1.4.1"
