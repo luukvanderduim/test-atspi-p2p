@@ -13,17 +13,11 @@ use zbus::names::OwnedBusName;
 use zbus::names::OwnedUniqueName;
 use zbus::zvariant::ObjectPath;
 
-static APP_NAME_PRE: &str = "evince";
-static APP_ARG_PRE: &str = "test.pdf";
-static APP_NAME: &str = "gedit";
-static APP_ARG: &str = "test.txt";
+static APP_NAME_PRE: &str = "mate-calc";
+static APP_NAME: &str = "firefox";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Create test files
-    std::fs::write("test.pdf", b"dummy pdf content")?;
-    std::fs::write("test.txt", b"dummy text content")?;
-
     // Configure a custom event formatter
     let format = fmt::format()
         .with_level(true) // don't include levels in formatted output
@@ -52,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     print_peers(peers.clone(), &mapping).await;
 
     info!("CI(p2p): Launching first child process \"{APP_NAME_PRE}\"");
-    let mut child_process_pre = launch_child(APP_NAME_PRE, Some(APP_ARG_PRE), true);
+    let mut child_process_pre = launch_child(APP_NAME_PRE, None, true);
 
     // Sleep to allow the first app to register
     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -65,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .unwrap_or_else(|| "Empty peer list".to_string());
 
     info!("CI(p2p): Launching second child process \"{APP_NAME}\"");
-    let mut child_process = launch_child(APP_NAME, Some(APP_ARG), true);
+    let mut child_process = launch_child(APP_NAME, None, true);
 
     // Registry needs a bit of time to populate with the new app
     tokio::time::sleep(Duration::from_secs(2)).await;
