@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_lock::Mutex;
 use atspi::ObjectRef;
@@ -50,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut child_process_pre = launch_child(APP_NAME_PRE, Some(APP_ARG_PRE), true);
 
     // Sleep to allow the first app to register
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     let last_busname_before = peers
         .lock()
@@ -63,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut child_process = launch_child(APP_NAME, Some(APP_ARG), true);
 
     // Registry needs a bit of time to populate with the new app
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     let launched_busname = peers
         .lock()
@@ -84,12 +85,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mapping = bus_names_to_human_readable(&a11y).await;
     print_peers(peers.clone(), &mapping).await;
 
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    tokio::time::sleep(Duration::from_secs(2)).await;
     info!("CI(p2p): Terminating \"{APP_NAME}\"");
 
     child_process.kill().expect("Failed to kill process");
     child_process.wait().expect("Failed to wait on process");
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     let mapping = bus_names_to_human_readable(&a11y).await;
     print_peers(peers.clone(), &mapping).await;
