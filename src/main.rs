@@ -20,6 +20,10 @@ static APP_ARG: &str = "test.txt";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Create test files
+    std::fs::write("test.pdf", b"dummy pdf content")?;
+    std::fs::write("test.txt", b"dummy text content")?;
+
     // Configure a custom event formatter
     let format = fmt::format()
         .with_level(true) // don't include levels in formatted output
