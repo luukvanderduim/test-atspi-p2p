@@ -13,9 +13,7 @@ use zbus::names::OwnedUniqueName;
 use zbus::zvariant::ObjectPath;
 
 static APP_NAME_PRE: &str = "eog";
-
 static APP_NAME: &str = "gedit";
-// static APP_ARG: &str = "";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -31,12 +29,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // as the default.
     tracing_subscriber::fmt().event_format(format).init();
 
-    info!("p2p CI test: Set session accessibility to true");
+    info!("CI(p2p): Set session accessibility to true");
     atspi::connection::set_session_accessibility(true)
         .await
         .expect("Failed to set session accessibility");
 
-    info!("p2p CI test: Create accessibility connection");
+    info!("CI(p2p): Create accessibility connection");
     let a11y = AccessibilityConnection::new()
         .await
         .expect("Failed to create accessibility connection");
@@ -46,8 +44,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mapping = bus_names_to_human_readable(&a11y).await;
     print_peers(peers.clone(), &mapping).await;
 
-    info!("p2p CI test: Launching first child process \"{APP_NAME_PRE}\"");
-    let mut child_process_pre = launch_child(APP_NAME_PRE, None);
+    info!("CI(p2p): Launching first child process \"{APP_NAME_PRE}\"");
+    let mut child_process_pre = launch_child(APP_NAME_PRE, None, true);
 
     // Sleep to allow the first app to register
     std::thread::sleep(std::time::Duration::from_secs(2));
@@ -57,10 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .await
         .last()
         .map(|p| p.unique_name().to_string())
-        .unwrap_or_else(|| "No application".to_string());
+        .unwrap_or_else(|| "Empty peer list".to_string());
 
-    info!("p2p CI test: Launching second child process \"{APP_NAME}\"");
-    let mut child_process = launch_child(APP_NAME, None);
+    info!("CI(p2p): Launching second child process \"{APP_NAME}\"");
+    let mut child_process = launch_child(APP_NAME, None, true);
 
     // Registry needs a bit of time to populate with the new app
     std::thread::sleep(std::time::Duration::from_secs(2));
@@ -77,15 +75,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     assert_eq!(
         launched_human_readable.to_lowercase(),
         APP_NAME,
-        "The launched app's name should match the \"{APP_NAME}\", but got: \"{launched_human_readable}\""
+        "The launched app's name should match \"{APP_NAME}\", but got: \"{launched_human_readable}\""
     );
-    info!("p2p CI test: ✅ Peer insert assertion passed");
+    info!("CI(p2p): ✅ Peer insert assertion passed");
 
     let mapping = bus_names_to_human_readable(&a11y).await;
     print_peers(peers.clone(), &mapping).await;
 
     std::thread::sleep(std::time::Duration::from_secs(2));
-    info!("p2p CI test: Terminating \"{APP_NAME}\"");
+    info!("CI(p2p): Terminating \"{APP_NAME}\"");
 
     child_process.kill().expect("Failed to kill process");
     child_process.wait().expect("Failed to wait on process");
@@ -99,20 +97,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .await
         .last()
         .map(|p| p.unique_name().to_string())
-        .unwrap_or_else(|| "None".to_string());
+        .unwrap_or_else(|| "Empty peer list".to_string());
 
     assert_eq!(
         last_busname_before, last_busname_after,
         "The last peer before launch and after termination should be the same, \
          but they differ: before: \"{last_busname_before}\", after: \"{last_busname_after}\""
     );
-    info!("p2p CI test: ✅ Peer removal assertion passed");
+    info!("CI(p2p): ✅ Peer removal assertion passed");
 
-    info!("p2p CI test: Terminating \"{APP_NAME_PRE}\"");
+    info!("CI(p2p): Terminating \"{APP_NAME_PRE}\"");
     child_process_pre.kill().expect("Failed to kill process");
     child_process_pre.wait().expect("Failed to wait on process");
 
-    info!("p2p CI test: ✅ All assertions passed, exiting");
+    info!("CI(p2p): ✅ All assertions passed, exiting");
     Ok(())
 }
 
@@ -196,14 +194,23 @@ async fn to_human_readable(bus_name: &OwnedUniqueName, a11y: &AccessibilityConne
         .expect("Failed to get name of root accessible")
 }
 
-fn launch_child(child_name: &str, child_arg: Option<&str>) -> std::process::Child {
+fn launch_child(child_name: &str, child_arg: Option<&str>, noisy: bool) -> std::process::Child {
     let mut command = std::process::Command::new(child_name);
     if let Some(arg) = child_arg {
         command.arg(arg);
     }
 
-    command
-        .stdout(std::process::Stdio::null())
-        .spawn()
-        .expect("Failed to launch child process")
+    // With inherit() - child output mixes with parent output
+    // With null() - only parent output appears, child is silent
+    if noisy {
+        command
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit());
+    } else {
+        command
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+    }
+
+    command.spawn().expect("Failed to launch child process")
 }
