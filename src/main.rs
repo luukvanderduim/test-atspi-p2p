@@ -1,12 +1,11 @@
-use std::sync::Arc;
-use std::time::Duration;
-
 use async_lock::Mutex;
 use atspi::ObjectRef;
 use atspi::connection::AccessibilityConnection;
 use atspi::connection::P2P;
 use atspi::connection::Peer;
 use atspi::proxy::accessible::ObjectRefExt;
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::info;
 use tracing_subscriber::fmt;
 use zbus::names::OwnedBusName;
@@ -14,7 +13,7 @@ use zbus::names::OwnedUniqueName;
 use zbus::zvariant::ObjectPath;
 
 static APP_NAME_PRE: &str = "mate-calc";
-static APP_NAME: &str = "firefox";
+static APP_NAME: &str = "eog";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
