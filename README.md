@@ -27,28 +27,36 @@ This demonstrates that peer insertion and deletion work correctly when applicati
 
 ## Example output
 
-```bash
-~/c/test-atspi-p2p (main)> cargo r
-    Finished `dev` profile [unoptimized] target(s) in 0.37s
+```shell
+    Finished `dev` profile [unoptimized] target(s) in 0.35s
      Running `target/debug/test-atspi-p2p`
-Starting accessibility connection with P2P support
-2025-07-09T13:49:11.408336Z  INFO main ThreadId(01) new: Connecting to a11y bus
-2025-07-09T13:49:11.408862Z  INFO main ThreadId(01) new: Connected to a11y bus name=":1.59"
-Last three `Peers`:
-Peer: ":1.23", well-known name: "None". human readable name: "blueman-applet"
-Peer: ":1.25", well-known name: "None". human readable name: "blueman-tray"
-Peer: ":1.31", well-known name: "None". human readable name: "code-insiders"
-Launching "firefox"
-2025-07-09T13:49:12.173975Z  INFO tokio-runtime-worker ThreadId(20) Inserted unique name: :1.60 into the peer list.
-Last three `Peers`:
-Peer: ":1.25", well-known name: "None". human readable name: "blueman-tray"
-Peer: ":1.31", well-known name: "None". human readable name: "code-insiders"
-Peer: ":1.60", well-known name: "None". human readable name: "Firefox"
-Terminating "firefox"
-2025-07-09T13:49:15.468729Z  INFO tokio-runtime-worker ThreadId(20) Peer with unique name: :1.60 left the bus - removed from peer list.
-Last three `Peers`:
-Peer: ":1.23", well-known name: "None". human readable name: "blueman-applet"
-Peer: ":1.25", well-known name: "None". human readable name: "blueman-tray"
-Peer: ":1.31", well-known name: "None". human readable name: "code-insiders"
-done
+2025-07-12T15:35:14.435159Z  INFO main ThreadId(01) CI(p2p): Set session accessibility to true
+2025-07-12T15:35:14.439176Z  INFO main ThreadId(01) CI(p2p): Create accessibility connection
+2025-07-12T15:35:14.440801Z  INFO main ThreadId(01) new: Connecting to a11y bus
+2025-07-12T15:35:14.441240Z  INFO main ThreadId(01) new: Connected to a11y bus name=":1.72"
+2025-07-12T15:35:14.469968Z  INFO main ThreadId(01) CI(p2p): Launching first child process "gedit"
+2025-07-12T15:35:14.711976Z  INFO tokio-runtime-worker ThreadId(07) Inserted unique name: :1.73 into the peer list.
+2025-07-12T15:35:15.480746Z  INFO                 main ThreadId(01) CI(p2p): ✅ Peer insertion assertion passed
+2025-07-12T15:35:15.480786Z  INFO                 main ThreadId(01) CI(p2p): Launching second child process "eog"
+2025-07-12T15:35:15.626576Z  INFO tokio-runtime-worker ThreadId(21) Inserted unique name: :1.74 into the peer list.
+2025-07-12T15:35:16.495014Z  INFO                 main ThreadId(01) CI(p2p): Printing peers...
+Peer: ... (total: 26)
+Peer: ":1.65", human readable name: "Firefox"
+Peer: ":1.73", human readable name: "gedit"
+Peer: ":1.74", human readable name: "eog"
+
+2025-07-12T15:35:16.495062Z  INFO                 main ThreadId(01) CI(p2p): ✅ Peer insertion assertion passed
+2025-07-12T15:35:17.495762Z  INFO                 main ThreadId(01) CI(p2p): Terminating "eog"
+2025-07-12T15:35:17.499494Z  INFO tokio-runtime-worker ThreadId(21) Peer with unique name: :1.74 left the bus - removed from peer list.
+2025-07-12T15:35:18.511014Z  INFO                 main ThreadId(01) CI(p2p): Printing peers...
+Peer: ... (total: 25)
+Peer: ":1.42", human readable name: "signal-desktop"
+Peer: ":1.65", human readable name: "Firefox"
+Peer: ":1.73", human readable name: "gedit"
+
+2025-07-12T15:35:18.511062Z  INFO                 main ThreadId(01) CI(p2p): ✅ Peer removal assertion passed
+2025-07-12T15:35:18.511067Z  INFO                 main ThreadId(01) CI(p2p): Terminating "gedit"
+2025-07-12T15:35:18.515983Z  INFO tokio-runtime-worker ThreadId(21) Peer with unique name: :1.73 left the bus - removed from peer list.
+2025-07-12T15:35:19.526207Z  INFO                 main ThreadId(01) CI(p2p): ✅ Peer removal assertion passed
+2025-07-12T15:35:19.526227Z  INFO                 main ThreadId(01) CI(p2p): ✅ All assertions passed, exiting
 ```

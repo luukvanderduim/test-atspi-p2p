@@ -1,5 +1,4 @@
 use async_lock::Mutex;
-use atspi::ObjectRef;
 use atspi::connection::AccessibilityConnection;
 use atspi::connection::P2P;
 use atspi::connection::Peer;
@@ -9,15 +8,13 @@ use std::time::Duration;
 use tracing::info;
 use tracing_subscriber::fmt;
 use zbus::names::OwnedBusName;
-use zbus::names::OwnedUniqueName;
-use zbus::zvariant::ObjectPath;
 
-static APP_NAME_PRE: &str = "gedit";
+static APP_NAME_PRE: &str = "mate-calc";
 static APP_NAME: &str = "eog";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Configure a custom event formatter
+    // Configure a custom tracing event formatter
     let format = fmt::format()
         .with_level(true) // don't include levels in formatted output
         .with_target(false) // don't include targets
@@ -41,74 +38,85 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let peers = a11y.peers().await;
 
-    let mapping = bus_names_to_human_readable(&a11y).await;
-    print_peers(peers.clone(), &mapping).await;
-
     info!("CI(p2p): Launching first child process \"{APP_NAME_PRE}\"");
     let mut child_process_pre = launch_child(APP_NAME_PRE, None, false);
 
     // Sleep to allow the first app to register
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let last_busname_before = peers
-        .lock()
-        .await
-        .last()
-        .map(|p| p.unique_name().to_string())
-        .unwrap_or_else(|| "Empty peer list".to_string());
+    let mapping = bus_names_to_human_readable(&a11y).await;
+    // Assert that the first app is part of the mapping
+    assert!(
+        mapping
+            .iter()
+            .any(|(_bus_name, human_readable_name)| human_readable_name
+                .to_lowercase()
+                .contains(APP_NAME_PRE)),
+        "App \"{APP_NAME_PRE}\" not registered as P2P application in Peers list."
+    );
+    info!("CI(p2p): ✅ Peer insertion assertion passed");
 
     info!("CI(p2p): Launching second child process \"{APP_NAME}\"");
     let mut child_process = launch_child(APP_NAME, None, false);
 
     // Registry needs a bit of time to populate with the new app
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    let launched_busname = peers
-        .lock()
-        .await
-        .last()
-        .map(|p| p.unique_name())
-        .unwrap()
-        .clone();
-    let launched_human_readable = to_human_readable(&launched_busname, &a11y).await;
-
-    assert_eq!(
-        launched_human_readable.to_lowercase(),
-        APP_NAME,
-        "The launched app's name should match \"{APP_NAME}\", but got: \"{launched_human_readable}\""
-    );
-    info!("CI(p2p): ✅ Peer insert assertion passed");
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     let mapping = bus_names_to_human_readable(&a11y).await;
     print_peers(peers.clone(), &mapping).await;
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Assert that the second app is part of the makking
+    assert!(
+        mapping
+            .iter()
+            .any(|(_bus_name, human_readable_name)| human_readable_name
+                .to_lowercase()
+                .contains(APP_NAME)),
+        "App \"{APP_NAME}\" not registered as P2P application in Peers list."
+    );
+    info!("CI(p2p): ✅ Peer insertion assertion passed");
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
     info!("CI(p2p): Terminating \"{APP_NAME}\"");
+
+    // Termination and removal of apps
 
     child_process.kill().expect("Failed to kill process");
     child_process.wait().expect("Failed to wait on process");
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     let mapping = bus_names_to_human_readable(&a11y).await;
     print_peers(peers.clone(), &mapping).await;
 
-    let last_busname_after = peers
-        .lock()
-        .await
-        .last()
-        .map(|p| p.unique_name().to_string())
-        .unwrap_or_else(|| "Empty peer list".to_string());
-
-    assert_eq!(
-        last_busname_before, last_busname_after,
-        "The last peer before launch and after termination should be the same, \
-         but they differ: before: \"{last_busname_before}\", after: \"{last_busname_after}\""
+    // Assert that the second app is no longer part of the makking
+    assert!(
+        !mapping
+            .iter()
+            .any(|(_bus_name, human_readable_name)| human_readable_name
+                .to_lowercase()
+                .contains(APP_NAME)),
+        "Second app \"{APP_NAME}\" not removed as P2P application from Peers list."
     );
     info!("CI(p2p): ✅ Peer removal assertion passed");
+
+    // Now we will remove the first inserted app
 
     info!("CI(p2p): Terminating \"{APP_NAME_PRE}\"");
     child_process_pre.kill().expect("Failed to kill process");
     child_process_pre.wait().expect("Failed to wait on process");
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let mapping = bus_names_to_human_readable(&a11y).await;
+
+    assert!(
+        !mapping
+            .iter()
+            .any(|(_bus_name, human_readable_name)| human_readable_name
+                .to_lowercase()
+                .contains(APP_NAME_PRE)),
+        "App \"{APP_NAME_PRE}\" not removed as P2P application from Peers list."
+    );
+    info!("CI(p2p): ✅ Peer removal assertion passed");
 
     info!("CI(p2p): ✅ All assertions passed, exiting");
     Ok(())
@@ -189,24 +197,6 @@ async fn bus_names_to_human_readable(
     }
 
     bus_name_to_human_readable
-}
-
-// Transforms a single bus name to a human readable name
-async fn to_human_readable(bus_name: &OwnedUniqueName, a11y: &AccessibilityConnection) -> String {
-    static ROOT_PATH: ObjectPath<'static> =
-        ObjectPath::from_static_str_unchecked("/org/a11y/atspi/accessible/root");
-    let conn = a11y.connection();
-
-    let root_object = ObjectRef::new(bus_name.as_ref(), ROOT_PATH.clone());
-    let root_accessible = root_object
-        .as_accessible_proxy(conn)
-        .await
-        .expect("Failed to get root accessible");
-
-    root_accessible
-        .name()
-        .await
-        .expect("Failed to get name of root accessible")
 }
 
 fn launch_child(child_name: &str, child_arg: Option<&str>, noisy: bool) -> std::process::Child {
