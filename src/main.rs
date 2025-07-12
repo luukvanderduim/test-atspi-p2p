@@ -12,7 +12,7 @@ use zbus::names::OwnedBusName;
 use zbus::names::OwnedUniqueName;
 use zbus::zvariant::ObjectPath;
 
-static APP_NAME_PRE: &str = "mate-calc";
+static APP_NAME_PRE: &str = "gedit";
 static APP_NAME: &str = "eog";
 
 #[tokio::main]
