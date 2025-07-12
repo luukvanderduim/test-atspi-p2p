@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     print_peers(peers.clone(), &mapping).await;
 
     info!("CI(p2p): Launching first child process \"{APP_NAME_PRE}\"");
-    let mut child_process_pre = launch_child(APP_NAME_PRE, None, true);
+    let mut child_process_pre = launch_child(APP_NAME_PRE, None, false);
 
     // Sleep to allow the first app to register
     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .unwrap_or_else(|| "Empty peer list".to_string());
 
     info!("CI(p2p): Launching second child process \"{APP_NAME}\"");
-    let mut child_process = launch_child(APP_NAME, None, true);
+    let mut child_process = launch_child(APP_NAME, None, false);
 
     // Registry needs a bit of time to populate with the new app
     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -114,32 +114,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-async fn print_peers(
-    peers: Arc<Mutex<Vec<Peer>>>,
-    bus_name_to_natural_name: &[(OwnedBusName, String)],
-) {
-    println!("Last three `Peers`:");
-    let peers = peers.lock().await;
+// If there are more then three peers, prints the last three peers
+// Let's indicate that there are more peers by printing "..." if there are more than three
+// We also print the human readable name if available and print pretty information about the peer
+async fn print_peers(peers: Arc<Mutex<Vec<Peer>>>, mapping: &[(OwnedBusName, String)]) {
+    info!("CI(p2p): Printing peers...");
 
-    let peers_to_print = &*peers.iter().rev().take(3).collect::<Vec<&Peer>>();
+    let peers_locked = peers.lock().await;
+    let total_peers = peers_locked.len();
 
-    for peer in peers_to_print.iter().rev() {
-        let mut well_known_name = String::from("None");
-        if let Some(name) = peer.well_known_name() {
-            well_known_name = name.to_string();
-        }
+    // The take` adaptor will take maximum N elements from left to right, so we reverse the iterator first
+    let last_peers: Vec<&Peer> = peers_locked.iter().rev().take(3).collect();
 
-        let human_readable = bus_name_to_natural_name
+    // If there are more than 3 peers, indicate there are more
+    if total_peers > 3 {
+        println!("Peer: ... (total: {total_peers})");
+    }
+
+    // Print in reverse to restore chronological order
+    for peer in last_peers.iter().rev() {
+        let unique_name = peer.unique_name();
+
+        // Look up the human-readable name from the mapping
+        // Mapping may be longer than `last_peers`
+        let human_readable = mapping
             .iter()
-            .find(|(bus_name, _)| **bus_name == **peer.unique_name())
-            .map(|(_, name)| name.clone());
+            .find_map(|(bus_name, name)| {
+                if bus_name.as_str() == unique_name.as_str() {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "not found".to_string());
 
-        println!(
-            "Peer: \"{}\", well-known name: {:?}. human readable name: \"{}\"",
-            peer.unique_name(),
-            well_known_name,
-            human_readable.unwrap_or_else(|| "Unknown".to_string())
-        );
+        println!("Peer: \"{unique_name}\", human readable name: \"{human_readable}\"");
+    }
+
+    if total_peers == 0 {
+        info!("CI(p2p): No peers found");
+    } else {
+        println!();
     }
 }
 
