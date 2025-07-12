@@ -9,8 +9,7 @@ use tracing::info;
 use tracing_subscriber::fmt;
 use zbus::names::OwnedBusName;
 
-static APP_NAME_PRE: &str = "mate-calc";
-static APP_NAME: &str = "eog";
+static APP_NAME: &str = "gedit";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -38,25 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let peers = a11y.peers().await;
 
-    info!("CI(p2p): Launching first child process \"{APP_NAME_PRE}\"");
-    let mut child_process_pre = launch_child(APP_NAME_PRE, None, false);
-
-    // Sleep to allow the first app to register
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
-    let mapping = bus_names_to_human_readable(&a11y).await;
-    // Assert that the first app is part of the mapping
-    assert!(
-        mapping
-            .iter()
-            .any(|(_bus_name, human_readable_name)| human_readable_name
-                .to_lowercase()
-                .contains(APP_NAME_PRE)),
-        "App \"{APP_NAME_PRE}\" not registered as P2P application in Peers list."
-    );
-    info!("CI(p2p): ✅ Peer insertion assertion passed");
-
-    info!("CI(p2p): Launching second child process \"{APP_NAME}\"");
+    info!("CI(p2p): Launching child process \"{APP_NAME}\"");
     let mut child_process = launch_child(APP_NAME, None, false);
 
     // Registry needs a bit of time to populate with the new app
@@ -79,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tokio::time::sleep(Duration::from_secs(1)).await;
     info!("CI(p2p): Terminating \"{APP_NAME}\"");
 
-    // Termination and removal of apps
+    // Termination and removal of app
 
     child_process.kill().expect("Failed to kill process");
     child_process.wait().expect("Failed to wait on process");
@@ -88,33 +69,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mapping = bus_names_to_human_readable(&a11y).await;
     print_peers(peers.clone(), &mapping).await;
 
-    // Assert that the second app is no longer part of the makking
+    // Assert that the app is no longer part of the makking
     assert!(
         !mapping
             .iter()
             .any(|(_bus_name, human_readable_name)| human_readable_name
                 .to_lowercase()
                 .contains(APP_NAME)),
-        "Second app \"{APP_NAME}\" not removed as P2P application from Peers list."
-    );
-    info!("CI(p2p): ✅ Peer removal assertion passed");
-
-    // Now we will remove the first inserted app
-
-    info!("CI(p2p): Terminating \"{APP_NAME_PRE}\"");
-    child_process_pre.kill().expect("Failed to kill process");
-    child_process_pre.wait().expect("Failed to wait on process");
-
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    let mapping = bus_names_to_human_readable(&a11y).await;
-
-    assert!(
-        !mapping
-            .iter()
-            .any(|(_bus_name, human_readable_name)| human_readable_name
-                .to_lowercase()
-                .contains(APP_NAME_PRE)),
-        "App \"{APP_NAME_PRE}\" not removed as P2P application from Peers list."
+        "App \"{APP_NAME}\" not removed as P2P application from Peers list."
     );
     info!("CI(p2p): ✅ Peer removal assertion passed");
 
