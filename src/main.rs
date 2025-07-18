@@ -1,3 +1,4 @@
+use argh::FromArgs;
 use async_lock::Mutex;
 use atspi::connection::AccessibilityConnection;
 use atspi::connection::P2P;
@@ -9,10 +10,41 @@ use tracing::info;
 use tracing_subscriber::fmt;
 use zbus::names::OwnedBusName;
 
-static APP_NAME: &str = "gedit";
+const SLEEP_DURATION: Duration = Duration::from_secs(1);
+const APP_NAME: &str = "gedit";
+
+/// Command line arguments for the application
+#[derive(FromArgs, Debug)]
+struct Args {
+    /// name of the child process to launch
+    #[argh(positional, default = "APP_NAME.to_string()")]
+    child_name: String,
+
+    /// enable verbose output from child process
+    #[argh(switch, short = 'v')]
+    verbose: bool,
+
+    /// configure the sleep time in seconds between child launch and assertions
+    #[argh(
+        option,
+        short = 's',
+        default = "SLEEP_DURATION",
+        from_str_fn(parse_duration)
+    )]
+    sleep: Duration,
+}
+
+fn parse_duration(s: &str) -> Result<Duration, String> {
+    s.parse::<u64>()
+        .map(Duration::from_secs)
+        .map_err(|_| format!("Failed to parse duration from '{s}'"))
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Parse command line arguments
+    let args: Args = argh::from_env();
+
     // Configure a custom tracing event formatter
     let format = fmt::format()
         .with_level(true) // don't include levels in formatted output
@@ -37,11 +69,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let peers = a11y.peers().await;
 
-    info!("CI(p2p): Launching child process \"{APP_NAME}\"");
-    let mut child_process = launch_child(APP_NAME, None, false);
+    info!("CI(p2p): Launching child process \"{}\"", &args.child_name);
+    let mut child_process = launch_child(&args.child_name, None, args.verbose);
 
     // Registry needs a bit of time to populate with the new app
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(args.sleep).await;
 
     let mapping = bus_names_to_human_readable(&a11y).await;
     print_peers(peers.clone(), &mapping).await;
@@ -52,19 +84,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .iter()
             .any(|(_bus_name, human_readable_name)| human_readable_name
                 .to_lowercase()
-                .contains(APP_NAME)),
-        "App \"{APP_NAME}\" not registered as P2P application in Peers list."
+                .contains(&args.child_name)),
+        "App \"{}\" not registered as P2P application in Peers list.",
+        &args.child_name
     );
     info!("CI(p2p): ✅ Peer insertion assertion passed");
 
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    info!("CI(p2p): Terminating \"{APP_NAME}\"");
+    tokio::time::sleep(args.sleep).await;
+    info!("CI(p2p): Terminating \"{}\"", &args.child_name);
 
     // Termination and removal of app
 
     child_process.kill().expect("Failed to kill process");
     child_process.wait().expect("Failed to wait on process");
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(args.sleep).await;
 
     let mapping = bus_names_to_human_readable(&a11y).await;
     print_peers(peers.clone(), &mapping).await;
@@ -75,8 +108,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .iter()
             .any(|(_bus_name, human_readable_name)| human_readable_name
                 .to_lowercase()
-                .contains(APP_NAME)),
-        "App \"{APP_NAME}\" not removed as P2P application from Peers list."
+                .contains(&args.child_name)),
+        "App \"{}\" not removed as P2P application from Peers list.",
+        &args.child_name
     );
     info!("CI(p2p): ✅ Peer removal assertion passed");
 
